@@ -100,6 +100,37 @@ for pids in Any[PidsAll(), PidsWorkers(), [2,3], :default]
     end
 end
 
+println("Testing get/set from both participating and non-participating workers")
+println()
+for dtype in [GlobalDict, DistributedDict]
+    d = dtype([2,3]) # dict on subset of workers
+
+    i = 1
+    # test get/set from both participating and non-participating workers
+    for p in procs()
+        i = i+1; k = i; v = string(i)
+        d[k] = v
+        @test v == remotecall_fetch((D, K)->D[K], p, d, k)
+
+        i = i+1; k = i; v = string(i)
+        remotecall_fetch((D, K, V)->(D[K]=V; nothing), p, d, k, v)
+        @test d[k] == v
+    end
+
+    delete!(d)
+end
+
+
+# ensure that the directory is empty on all nodes
+println("Test for any leaks")
+println()
+results=Bool[]
+for p in procs()
+    push!(results, remotecall_fetch(()->isempty(ClusterDicts.directory), p))
+end
+
+@test all(results)
+
 
 
 

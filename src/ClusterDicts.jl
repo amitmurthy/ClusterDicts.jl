@@ -53,50 +53,47 @@ end
 
 const directory = Dict()
 
-function init_dict_local(n, K, V, dtype)
+function exists(pids, name, K, V, dtype)
+    assert(myid() == 1)
+
     global directory
-    if haskey(directory, n)
-        existing = directory[(n, :dtype)]
-        if (existing[1] == K) && (existing[2] == V) && (existing[3] == dtype)
-            return :OK
-        else
-            return :EXISTS
-        end
+    D = get(directory, (name, :dtype), nothing)
+    D == nothing && return (false, false)
+
+    if (D.pids == pids) && (keytype(D) == K) && (valtype(D) == V) && isa(D, dtype)
+        return (true, true)
     else
-       directory[n] = Dict{K,V}()
-       directory[(n, :dtype)] = (K, V, dtype)
-       return :OK
+        return (true, false)
     end
 end
 
-function delete_dict_local(n)
-    global directory
-    delete!(directory, n)
+function init_dict_local(pids, name, K, V, dtype)
+    if (myid() in pids)
+        directory[name] = Dict{K,V}()
+    end
+    directory[(name, :dtype)] = dtype{K, V}(name, pids)
     nothing
 end
 
-function init_dict(pids, n, K, V, dtype)
-    results = []
+function init_dict(pids, name, K, V, dtype)
+    # Ensure no dict with the same name but different specifications exists
+    (name_exists, specs_exists) = remotecall_fetch(exists, 1, pids, name, K, V, dtype)
+    if specs_exists
+        return true
+    elseif name_exists
+        error("A cluster dictionary with name " * name * " but different specifications already exists.")
+    end
+
+    # Instantiate on 1 first. Master holds meta data for all dicts.
+    remotecall_fetch(init_dict_local, 1, pids, name, K, V, dtype)
+
     @sync begin
-        for p in pids
-            @async push!(results, (p, remotecall_fetch(init_dict_local, p, n, K, V, dtype)))
+        for p in filter(x->x!=1, pids)
+            @async remotecall_fetch(init_dict_local, p, pids, name, K, V, dtype)
         end
     end
 
-    err = []
-    ok = []
-    map(x -> x[2] == :EXISTS ? push!(err, x[1]) : push!(ok, x[1]), results)
-
-    if length(err) > 0
-        # cleanup newly created dicts
-        @sync begin
-            for p in ok
-                @async remotecall_fetch(delete_dict_local, p, n)
-            end
-        end
-
-        error("A Cluster Dictionary with name $n already exists.")
-    end
+    return false
 end
 
 abstract DistributedAssociative{K,V} <: Associative{K,V}
@@ -107,9 +104,16 @@ for DT in [:GlobalDict, :DistributedDict]
             pids::AbstractPids
 
             function $DT(name::AbstractString, pids::AbstractPids, ktype, vtype)
-                init_dict(pids, name, ktype, vtype, $DT)
-                new(name, pids)
+                pre_exists = init_dict(pids, name, ktype, vtype, $DT)
+                pre_exists && warn("A cluster dictionary with name " * name * " and similar specification exists.")
+                if (myid()==1) || (myid() in pids)
+                    return directory[(name, :dtype)]
+                else
+                    $DT(name, pids)
+                end
             end
+
+            $DT(name::AbstractString, pids::AbstractPids) = new(name, pids)
         end
 
     @eval $DT(;kwargs...) = $DT(PidsWorkers(); kwargs...)
@@ -125,8 +129,39 @@ for DT in [:GlobalDict, :DistributedDict]
 
     @eval $DT(pids::AbstractPids; name=next_name(), ktype=Any, vtype=Any) = $DT{ktype, vtype}(name, pids, ktype, vtype)
 
+    @eval function $DT(name::AbstractString)
+            # this method expects the directory to have an entry
+            return directory[(name, :dtype)]
+        end
+
     @eval Base.show(io::IO, d::$DT) = println(typeof(d), "(", d.name, ",", d.pids, ")")
 end
+
+function serialize(S::SerializationState, d::DistributedAssociative)
+    p = Base.worker_id_from_socket(s.io)
+    Serializer.serialize_type(S, typeof(d))
+
+    # Optimize ser/deser by sending pids array only if the destination worker does
+    # not have it.
+
+    if (p in rr.pids) || (p == 1)
+        serialize(S, (d.name, nothing))
+    else
+        serialize(S, (d.name, d.pids))
+    end
+end
+
+function deserialize{T<:DistributedAssociative}(S::SerializationState, t::Type{T})
+    global directory
+    (name, pids) = deserialize(S)
+    if pids == nothing
+        # we expect the local directory to have an entry
+        return T(name)
+    else
+        return T(name, pids)
+    end
+end
+
 
 where(d::DistributedDict, k) = d.pids[Int(hash(k) % length(d.pids) + 1)]
 function where(d::GlobalDict, k=nothing)
@@ -223,7 +258,18 @@ function collect_from_everywhere(d::DistributedAssociative, f, args...)
     results
 end
 
-delete!_local(name) = (global directory; delete!(directory, name); nothing)
-Base.delete!(d::DistributedAssociative) = (collect_from_everywhere(d, delete!_local, d.name); nothing)
+function delete!_local(name)
+    global directory
+    delete!(directory, name)
+    delete!(directory, (name, :dtype))
+    nothing
+end
+
+function Base.delete!(d::DistributedAssociative)
+    collect_from_everywhere(d, delete!_local, d.name);
+    if !(1 in d.pids)
+        remotecall_fetch(delete!_local, 1, d.name)
+    end
+end
 
 end # module
