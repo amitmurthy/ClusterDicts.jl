@@ -51,14 +51,20 @@ let DID = 0
     end
 end
 
-const directory = Dict{AbstractString, Associative}()
+const directory = Dict()
 
-function init_dict_local(n, K, V)
+function init_dict_local(n, K, V, dtype)
     global directory
     if haskey(directory, n)
-        return :EXISTS
+        existing = directory[(n, :dtype)]
+        if (existing[1] == K) && (existing[2] == V) && (existing[3] == dtype)
+            return :OK
+        else
+            return :EXISTS
+        end
     else
        directory[n] = Dict{K,V}()
+       directory[(n, :dtype)] = (K, V, dtype)
        return :OK
     end
 end
@@ -69,11 +75,11 @@ function delete_dict_local(n)
     nothing
 end
 
-function init_dict(pids, n, K, V)
+function init_dict(pids, n, K, V, dtype)
     results = []
     @sync begin
         for p in pids
-            @async push!(results, (p, remotecall_fetch(init_dict_local, p, n, K, V)))
+            @async push!(results, (p, remotecall_fetch(init_dict_local, p, n, K, V, dtype)))
         end
     end
 
@@ -101,7 +107,7 @@ for DT in [:GlobalDict, :DistributedDict]
             pids::AbstractPids
 
             function $DT(name::AbstractString, pids::AbstractPids, ktype, vtype)
-                init_dict(pids, name, ktype, vtype)
+                init_dict(pids, name, ktype, vtype, $DT)
                 new(name, pids)
             end
         end

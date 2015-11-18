@@ -1,6 +1,6 @@
 # ClusterDicts
 
-Distributed dictionary for Julia.
+Global and Distributed dictionaries for Julia.
 
 GlobalDict and DistributedDict
 ---------------------------
@@ -38,7 +38,6 @@ Constructors
   Keyword args remain the same.
 
 
-
 Methods
 -------
 
@@ -63,6 +62,9 @@ They have to be necessarily released by calling `delete!(d::GlobalDict)` and `de
 
 TODO
 ----
+
+- Optimize serialization / deserialization of the dict types.
+
 - Concurrent updates : This current version makes no attempt to handle race conditions when multiple tasks or processes
 update the same key. For example, if `d` is a `GlobalDict`, `d[k] = v` sets `k` to `v` on all participating workers.
 If two tasks try to set `d[k] = v1` and ``d[k] = v2` at the same time, there is no guarantee the value will be either
