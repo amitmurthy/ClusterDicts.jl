@@ -28,7 +28,7 @@ build_script:
 # Need to convert from shallow to complete for Pkg.clone to work
   - IF EXIST .git\shallow (git fetch --unshallow)
   - C:\projects\julia\bin\julia -e "versioninfo();
-      Pkg.clone(pwd(), \"GlobalDict\"); Pkg.build(\"GlobalDict\")"
+      Pkg.clone(pwd(), \"ClusterDicts\"); Pkg.build(\"ClusterDicts\")"
 
 test_script:
-  - C:\projects\julia\bin\julia --check-bounds=yes -e "Pkg.test(\"GlobalDict\")"
+  - C:\projects\julia\bin\julia --check-bounds=yes -e "Pkg.test(\"ClusterDicts\")"
