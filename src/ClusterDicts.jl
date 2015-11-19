@@ -3,7 +3,7 @@ VERSION >= v"0.4.0-dev+6521" && __precompile__(true)
 module ClusterDicts
 using Compat
 
-export GlobalDict, DistributedDict, Pids, PidsAll, PidsWorkers
+export GlobalDict, DistributedDict, Pids, PidsAll, PidsWorkers, ValueF
 
 abstract AbstractPids
 
@@ -11,10 +11,11 @@ type Pids <: AbstractPids
     pids::Array
 end
 
-type PidsAll <: AbstractPids
-end
+type PidsAll <: AbstractPids end
+type PidsWorkers <: AbstractPids end
 
-type PidsWorkers <: AbstractPids
+type ValueF
+    f::Function
 end
 
 Base.in(x, pids::Pids) = x in pids.pids
@@ -221,6 +222,7 @@ Base.pop!(d::DistributedAssociative, k) = pop_impl!(d, k, ()->throw(KeyError("No
 Base.pop!(d::DistributedAssociative, k, default) = pop_impl!(d, k, ()->default)
 
 setindex!_local(name, k, v) = (global directory; directory[name][k] = v; nothing)
+setindex!_local(name, k, v::ValueF) = (global directory; directory[name][k] = v.f(); nothing)
 
 function Base.setindex!(d::GlobalDict, v, k)
     @sync begin

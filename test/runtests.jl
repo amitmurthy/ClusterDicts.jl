@@ -18,6 +18,23 @@ function test_d(d, pids, name, ktype, vtype)
             end
         end
         @test all(results)
+
+        (k, _) = getkv(102, ktype, vtype)
+        v = vtype in (ASCIIString, Any) ? ValueF(()->string(myid())) : ValueF(()->convert(vtype, myid()))
+        d[k] = v
+
+        @sync begin
+            results=Bool[]
+            for p in d.pids
+                if vtype in (ASCIIString, Any)
+                    @async push!(results, remotecall_fetch((D, K)-> myid() == convert(Int, parse(Float64, D[K])), p, d, k))
+                else
+                    @async push!(results, remotecall_fetch((D, K)-> myid() == convert(Int, D[K]), p, d, k))
+                end
+            end
+        end
+        @test all(results)
+
     else
         # test it is distributed properly
         for i in 1001:1100
@@ -32,6 +49,25 @@ function test_d(d, pids, name, ktype, vtype)
             end
         end
         @test sum(results) == length(d)
+
+        results = Int[]
+        for i in 1200:1299
+            (k, _) = getkv(i, ktype, vtype)
+            v = vtype in (ASCIIString, Any) ? ValueF(()->string(myid())) : ValueF(()->convert(vtype, myid()))
+            d[k] = v
+
+            if vtype in (ASCIIString, Any)
+                push!(results, convert(Int, parse(Float64, d[k])))
+            else
+                push!(results, convert(Int, d[k]))
+            end
+        end
+
+        (r, counts) = hist(results)
+        for c in counts
+           @test (c > 1 && c < 100)
+        end
+        @test convert(Int, maximum(r)) == maximum(d.pids)
     end
 end
 

@@ -52,6 +52,20 @@ The following functions of `Associative` are implemented:
 - `pop!`
 - `delete!`
 
+ValueF
+------
+
+Any closure wrapped in a ValueF will execute the closure on the node where the key is being assigned.
+
+For example, for a `GlobalDict`,
+```
+    d[k] = ValueF(()->myid())
+```
+
+will set the value of d[k] to 2 on pid 2, 3 on pid 3 and so on.
+
+And for a `DistributedDict`, it will be set only on the node that the key hashes to.
+
 
 Garbage Collection
 ------------------
