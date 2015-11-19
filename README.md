@@ -24,9 +24,9 @@ Constructors
     - `name` is a logical name for the dictionary. It should be unique across any such dictionary created across
     modules or different packages. Usually left unspecified in which case the system creates a unique name.
 
-    - `ktype` is the type of the keys
+    - `ktype` is the type of the keys. Defaults to `Any`.
 
-    - `vtype` is the type of the values
+    - `vtype` is the type of the values. Defaults to `Any`.
 
 - `DistributedDict(pids=PidsWorkers(); name::AbstractString=next_name(), ktype=Any, vtype=Any)`
   similar to the `GlobalDict` constructor.
@@ -38,10 +38,10 @@ Constructors
   Keyword args remain the same.
 
 
-Methods
--------
+Functions
+---------
 
-The following methods of `Associative` are implemented:
+The following functions of `Associative` are implemented:
 
 - `isempty`
 - `length`
@@ -68,7 +68,7 @@ update the same key. For example, if `d` is a `GlobalDict`, `d[k] = v` sets `k` 
 If two tasks try to set `d[k] = v1` and ``d[k] = v2` at the same time, there is no guarantee the value will be either
 all `v1` or all `v2` on all workers.
 
-- More `Associative` related methods supported.
+- More `Associative` functions to be implemented.
 
 - Handle worker exits : Resiliency in the event of workers exiting has to be handled.
 
