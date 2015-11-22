@@ -1,5 +1,11 @@
 # ClusterDicts
 
+[![Build Status](https://travis-ci.org/JuliaWeb/ClusterDicts.jl.svg?branch=master)](https://travis-ci.org/JuliaWeb/ClusterDicts.jl)
+[![codecov.io](http://codecov.io/github/JuliaWeb/ClusterDicts.jl/coverage.svg?branch=master)](http://codecov.io/github/JuliaWeb/ClusterDicts.jl?branch=master)
+
+[![ClusterDicts](http://pkg.julialang.org/badges/ClusterDicts_0.4.svg)](http://pkg.julialang.org/?pkg=ClusterDicts&ver=0.4)
+---
+
 Global and Distributed dictionaries for Julia.
 
 GlobalDict and DistributedDict
